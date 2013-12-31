@@ -5,6 +5,7 @@ import pygame
 from pygame.locals import *
 
 from colours import colours
+import resources
 
 
 class Corn(object):
@@ -18,6 +19,15 @@ class Corn(object):
         super(Corn, self).__init__()
         self.x = x
         self.speed = speed
+        self._image = resources.images['corn']
+
+    def pop(self):
+        self.popped = True
+        self._image = resources.images['corn-popped']
+
+    @property
+    def image(self):
+        return pygame.transform.scale(self._image, (20, 20))
 
 
 class Pop(object):
@@ -35,6 +45,8 @@ class Pop(object):
     time_since_last_corn = 0
     min_next_corn = 500
     max_next_corn = 4000
+    min_speed = 2
+    max_speed = 5
 
     def validate_settings(self):
         assert self.win_width % self.cell_size == 0, ("Window width must be a "
@@ -59,7 +71,7 @@ class Pop(object):
                                                 self.max_next_corn)
         new_corn = Corn(
             x=random.randint(1, self.cell_width - 1) * self.cell_size,
-            speed=random.randint(2, 5)
+            speed=random.randint(self.min_speed, self.max_speed)
         )
         self.corns.append(new_corn)
 
@@ -76,18 +88,11 @@ class Pop(object):
                              (self.win_width, y))
 
     def draw_corn(self, corn):
-        if corn.popped:
-            outer_rect = pygame.Rect(corn.x, corn.y,
-                                     self.cell_size, self.cell_size)
-            pygame.draw.rect(self.display, colours.light_grey, outer_rect)
-            inner_rect = pygame.Rect(
-                corn.x + 4, corn.y + 4, self.cell_size - 8, self.cell_size - 8)
-            pygame.draw.rect(self.display, colours.white, inner_rect)
-        else:
-            half_cell = int(self.cell_size * 0.5)
-            pygame.draw.circle(self.display, colours.yellow,
-                               (corn.x + half_cell, corn.y + half_cell),
-                               half_cell - 4)
+        image_rect = pygame.Rect((
+            corn.x, corn.y,
+            self.cell_size, self.cell_size
+        ))
+        self.display.blit(corn.image, image_rect)
 
     def terminate(self):
         pygame.quit()
@@ -111,6 +116,14 @@ class Pop(object):
         self.display.fill(colours.black)
         self.draw_grid()
 
+    def is_mouse_on_corn(self, corn):
+        return all((
+            self.mouse[0] > corn.x,
+            self.mouse[0] < (corn.x + self.cell_width),
+            self.mouse[1] > corn.y,
+            self.mouse[1] < (corn.y + self.cell_width)
+        ))
+
     def run(self):
         while True:
             for event in pygame.event.get():
@@ -120,13 +133,8 @@ class Pop(object):
                     self.mouse = event.pos
                 elif event.type == MOUSEBUTTONUP:
                     for corn in self.corns:
-                        collision = all((
-                            self.mouse[0] > corn.x,
-                            self.mouse[0] < (corn.x + self.cell_width),
-                            self.mouse[1] > corn.y,
-                            self.mouse[1] < (corn.y + self.cell_width)))
-                        if collision:
-                            corn.popped = True
+                        if self.is_mouse_on_corn(corn):
+                            corn.pop()
 
             self.update_timers()
 
